@@ -24,7 +24,7 @@ void test_display_on(void) {
     TEST_FAIL_MESSAGE("MCP23008 object is null");
   }
 
-  i2cip_errorlevel_t errlev = mcp->set((i2cip_mcp23008_t)0xFF, (i2cip_mcp23008_bitmask_t)0xFF);
+  i2cip_errorlevel_t errlev = mcp->set((i2cip_mcp23008_t)(1 << I2CIP_LCD_MCP23008_BACKLIGHT), (i2cip_mcp23008_bitmask_t)(1 << I2CIP_LCD_MCP23008_BACKLIGHT));
   TEST_ASSERT_EQUAL(I2CIP_ERR_NONE, errlev);
 }
 
@@ -33,7 +33,7 @@ void test_display_off(void) {
     TEST_FAIL_MESSAGE("MCP23008 object is null");
   }
 
-  i2cip_errorlevel_t errlev = mcp->set((i2cip_mcp23008_t)0x00, (i2cip_mcp23008_bitmask_t)0xFF);
+  i2cip_errorlevel_t errlev = mcp->set((i2cip_mcp23008_t)0x00, (i2cip_mcp23008_bitmask_t)(1 << I2CIP_LCD_MCP23008_BACKLIGHT));
   TEST_ASSERT_EQUAL(I2CIP_ERR_NONE, errlev);
 }
 

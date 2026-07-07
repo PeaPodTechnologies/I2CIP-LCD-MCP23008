@@ -268,16 +268,82 @@ LCD::LCD(MCP23008* mcp) : mcp(mcp), OutputInterface<String, i2cip_lcd_args_t>(nu
 LCD::~LCD() { }
 
 size_t LCD::write(uint8_t c) {
-  return this->send(c, true) == I2CIP_ERR_NONE ? 1 : 0; // Return number of bytes written
+  int row_offsets[] = {0x00, 0x40, 0x14, 0x54};
+  size_t r = 0; uint8_t i = 0;
+  switch(c) {
+    case '\0':
+      this->line = 0; // Reset line counter on null character
+      return 1;
+    case '\r':
+    case '\t':
+      return 1; // NOP here is OK
+    case '\n':
+      this->line++;
+      if(this->line >= 4) this->line = 0; // Wrap around if exceeding 4 lines
+      while(r == 0 && i < I2CIP_LCD_WRITE_RETRIES) {
+        i++;
+        r = (this->send(I2CIP_LCD_SETDDRAMADDR | (row_offsets[this->line]), false) == I2CIP_ERR_NONE ? 1 : 0);
+        delayMicroseconds(I2CIP_LCD_DELAY_MICROS);
+      }
+      break;
+    default:
+      while(r == 0 && i < I2CIP_LCD_WRITE_RETRIES) { // Fewer retries; multiples
+        i++;
+        r = (this->send(c, true) == I2CIP_ERR_NONE ? 1 : 0);
+        delayMicroseconds(I2CIP_LCD_DELAY_MICROS);
+      }
+      break;
+  }
+  return r;
 }
 
 i2cip_errorlevel_t LCD::set(const String& value, const i2cip_lcd_args_t& args) {
+  this->line = 0; // Reset line counter on new string
+  
   if(this->mcp == nullptr) {
     return I2CIP_ERR_SOFT;
   }
 
+  // ENTER 4-BIT MODE
+
+  i2cip_errorlevel_t errlev = this->mcp->set((i2cip_mcp23008_t)0x00, (i2cip_mcp23008_bitmask_t)(
+    (1 << I2CIP_LCD_MCP23008_RS) |
+    (1 << I2CIP_LCD_MCP23008_E)
+  )); // Set RS bit; set E bit low
+  I2CIP_ERR_BREAK(errlev);
+
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set 4-bit mode
+  I2CIP_ERR_BREAK(errlev);
+
+  errlev = pulseEnable();
+  I2CIP_ERR_BREAK(errlev);
+
+  delayMicroseconds(4500);
+
+  // second try
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set 4-bit mode
+  I2CIP_ERR_BREAK(errlev);
+
+  errlev = pulseEnable();
+  I2CIP_ERR_BREAK(errlev);
+  delayMicroseconds(4500); // wait min 4.1ms
+
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000));
+  I2CIP_ERR_BREAK(errlev);
+
+  errlev = pulseEnable();
+  I2CIP_ERR_BREAK(errlev);
+  delayMicroseconds(150);
+
+  // set to 8-bit interface
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x02 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000));
+  I2CIP_ERR_BREAK(errlev);
+
+  errlev = pulseEnable();
+  I2CIP_ERR_BREAK(errlev);
+
   // COMMAND Function set: 2-line, 5x8 dots (default), 4-bit mode (default)
-  i2cip_errorlevel_t errlev = this->send(I2CIP_LCD_FUNCTIONSET | I2CIP_LCD_2LINE, false);
+  errlev = this->send(I2CIP_LCD_FUNCTIONSET | I2CIP_LCD_2LINE, false);
   I2CIP_ERR_BREAK(errlev);
 
   // COMMAND Display control: display on, cursor off (default), blink off (default)
@@ -288,16 +354,19 @@ i2cip_errorlevel_t LCD::set(const String& value, const i2cip_lcd_args_t& args) {
   errlev = this->send(I2CIP_LCD_ENTRYMODESET | I2CIP_LCD_ENTRYLEFT, false);
   I2CIP_ERR_BREAK(errlev);
 
+  // COMMAND Clear display
+  errlev = this->send(I2CIP_LCD_CLEARDISPLAY, false);
+  I2CIP_ERR_BREAK(errlev);
+
+  // COMMAND Return home
+  errlev = this->send(I2CIP_LCD_RETURNHOME, false);
+  I2CIP_ERR_BREAK(errlev);
+
   // Backlight
   errlev = this->mcp->set((i2cip_mcp23008_t)(1 << I2CIP_LCD_MCP23008_BACKLIGHT), (i2cip_mcp23008_bitmask_t)(1 << I2CIP_LCD_MCP23008_BACKLIGHT));
   I2CIP_ERR_BREAK(errlev);
 
-  for(uint8_t i = 0; i < value.length(); i++) {
-    errlev = this->send(value.c_str()[i], true);
-    I2CIP_ERR_BREAK(errlev);
-  }
-
-  return errlev;
+  return this->print(value) == 0 ? I2CIP_ERR_SOFT : I2CIP_ERR_NONE; // Return error if nothing was printed
 }
 
 #endif

@@ -131,6 +131,10 @@ class MCP23008 : public Device, public IOInterface<i2cip_mcp23008_t, i2cip_mcp23
 #define I2CIP_LCD_5x10DOTS 0x04 // 10 pixel high font mode
 #define I2CIP_LCD_5x8DOTS 0x00 // 8 pixel high font mode
 
+// options
+#define I2CIP_LCD_WRITE_RETRIES 3 // Number of times to retry a write operation before failing
+#define I2CIP_LCD_DELAY_MICROS 100 // Delay between writes (micros)
+
 typedef enum { LCD_ARGS_NONE = 0x0 } i2cip_lcd_args_t;
 
 class LCD : public OutputInterface<String, i2cip_lcd_args_t>, private Print {
@@ -139,6 +143,8 @@ class LCD : public OutputInterface<String, i2cip_lcd_args_t>, private Print {
 
   private:
     MCP23008* mcp;
+
+    uint8_t line = 0;
 
     inline i2cip_errorlevel_t pulseEnable(void) {
       if(this->mcp == nullptr) {
@@ -160,10 +166,10 @@ class LCD : public OutputInterface<String, i2cip_lcd_args_t>, private Print {
         return I2CIP_ERR_SOFT;
       }
 
-      i2cip_errorlevel_t errlev = this->mcp->set((i2cip_mcp23008_t)(rs ? (1 << I2CIP_LCD_MCP23008_RS) : 0), (i2cip_mcp23008_bitmask_t)(
+      i2cip_errorlevel_t errlev = this->mcp->set((i2cip_mcp23008_t)(rs ? (1 << I2CIP_LCD_MCP23008_RS) : 0x00), (i2cip_mcp23008_bitmask_t)(
         (1 << I2CIP_LCD_MCP23008_RS) |
         (1 << I2CIP_LCD_MCP23008_E)
-      )); // Set RS and E bits
+      )); // Set RS bit; set E bit low
       I2CIP_ERR_BREAK(errlev);
       
       // Send high nibble
