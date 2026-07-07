@@ -5,7 +5,7 @@
 
 #include <I2CIP.h>
 
-// #define MCP23XXX_BANK 1 // Uncomment if IOCON.BANK = 1
+#define MCP23XXX_BANK 1 // Uncomment if IOCON.BANK = 1
 #define MCP23XXX_USE_OLAT 1 // Uncomment to use OLAT instead of GPIO for output
 
 // Registers
@@ -86,6 +86,110 @@ class MCP23008 : public Device, public IOInterface<i2cip_mcp23008_t, i2cip_mcp23
      * @param args Number of bytes to write
      **/
     i2cip_errorlevel_t set(const i2cip_mcp23008_t& value, const i2cip_mcp23008_bitmask_t& args) override;
+};
+
+// Pins
+#define I2CIP_LCD_MCP23008_BACKLIGHT 0x7
+#define I2CIP_LCD_MCP23008_RS 0x1
+#define I2CIP_LCD_MCP23008_E 0x2
+
+// Commands
+#define I2CIP_LCD_CLEARDISPLAY 0x01 // Clear display, set cursor position to zero
+#define I2CIP_LCD_RETURNHOME 0x02   // Set cursor position to zero
+#define I2CIP_LCD_ENTRYMODESET 0x04 // Sets the entry mode
+#define I2CIP_LCD_DISPLAYCONTROL 0x08 // Controls the display; does stuff like turning it off and on
+#define I2CIP_LCD_CURSORSHIFT 0x10 // Lets you move the cursor
+#define I2CIP_LCD_FUNCTIONSET 0x20 // Used to send the function to set to the display
+#define I2CIP_LCD_SETCGRAMADDR 0x40 // Used to set the CGRAM (character generator RAM) with characters
+#define I2CIP_LCD_SETDDRAMADDR 0x80 // Used to set the DDRAM (Display Data RAM)
+
+// flags for display entry mode
+#define I2CIP_LCD_ENTRYRIGHT 0x00 // Used to set text to flow from right to left
+#define I2CIP_LCD_ENTRYLEFT 0x02  // Uset to set text to flow from left to right
+#define I2CIP_LCD_ENTRYSHIFTINCREMENT 0x01 // Used to 'right justify' text from the cursor
+#define I2CIP_LCD_ENTRYSHIFTDECREMENT 0x00 // Used to 'left justify' text from the cursor
+
+// flags for display on/off control
+#define I2CIP_LCD_DISPLAYON 0x04 // Turns the display on
+#define I2CIP_LCD_DISPLAYOFF 0x00 // Turns the display off
+#define I2CIP_LCD_CURSORON 0x02 // Turns the cursor on
+#define I2CIP_LCD_CURSOROFF 0x00 // Turns the cursor off
+#define I2CIP_LCD_BLINKON 0x01 // Turns on the blinking cursor
+#define I2CIP_LCD_BLINKOFF 0x00 // Turns off the blinking cursor
+
+// flags for display/cursor shift
+#define I2CIP_LCD_DISPLAYMOVE 0x08 // Flag for moving the display
+#define I2CIP_LCD_CURSORMOVE 0x00 // Flag for moving the cursor
+#define I2CIP_LCD_MOVERIGHT 0x04 // Flag for moving right
+#define I2CIP_LCD_MOVELEFT 0x00 // Flag for moving left
+
+// flags for function set
+#define I2CIP_LCD_8BITMODE 0x10 // LCD 8 bit mode
+#define I2CIP_LCD_4BITMODE 0x00 // LCD 4 bit mode
+#define I2CIP_LCD_2LINE 0x08 // LCD 2 line mode
+#define I2CIP_LCD_1LINE 0x00 // LCD 1 line mode
+#define I2CIP_LCD_5x10DOTS 0x04 // 10 pixel high font mode
+#define I2CIP_LCD_5x8DOTS 0x00 // 8 pixel high font mode
+
+typedef enum { LCD_ARGS_NONE = 0x0 } i2cip_lcd_args_t;
+
+class LCD : public OutputInterface<String, i2cip_lcd_args_t>, private Print {
+  I2CIP_OUTPUT_USE_FAILSAFE(String, i2cip_lcd_args_t);
+  I2CIP_OUTPUT_USE_TOSTRING(String, "%s");
+
+  private:
+    MCP23008* mcp;
+
+    inline i2cip_errorlevel_t pulseEnable(void) {
+      if(this->mcp == nullptr) {
+        return I2CIP_ERR_SOFT;
+      }
+
+      i2cip_errorlevel_t errlev = this->mcp->set((i2cip_mcp23008_t)(1 << I2CIP_LCD_MCP23008_E), (i2cip_mcp23008_bitmask_t)(1 << I2CIP_LCD_MCP23008_E)); // Leave RS low
+      delayMicroseconds(1); // enable pulse must be >450ns
+
+      // Don't handle errlev, we don't want to leave the E bit high if we fail to write the data
+      
+      errlev = this->mcp->set((i2cip_mcp23008_t)(0), (i2cip_mcp23008_bitmask_t)(1 << I2CIP_LCD_MCP23008_E));
+      delayMicroseconds(100); // commands need > 37us to settle
+      return errlev;
+    }
+
+    inline i2cip_errorlevel_t send(const uint8_t& value, const bool& rs = true) {
+      if(this->mcp == nullptr) {
+        return I2CIP_ERR_SOFT;
+      }
+
+      i2cip_errorlevel_t errlev = this->mcp->set((i2cip_mcp23008_t)(rs ? (1 << I2CIP_LCD_MCP23008_RS) : 0), (i2cip_mcp23008_bitmask_t)(
+        (1 << I2CIP_LCD_MCP23008_RS) |
+        (1 << I2CIP_LCD_MCP23008_E)
+      )); // Set RS and E bits
+      I2CIP_ERR_BREAK(errlev);
+      
+      // Send high nibble
+
+      errlev = this->mcp->set((i2cip_mcp23008_t)(((value >> 4) & 0x0F) << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set high nibble
+      I2CIP_ERR_BREAK(errlev);
+
+      errlev = pulseEnable();
+      I2CIP_ERR_BREAK(errlev);
+
+      // Send low nibble
+
+      errlev = this->mcp->set((i2cip_mcp23008_t)((value & 0x0F) << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set low nibble
+      I2CIP_ERR_BREAK(errlev);
+
+      return pulseEnable();
+    }
+
+  public:
+    LCD(MCP23008* mcp);
+
+    ~LCD();
+
+    size_t write(uint8_t c) override;
+
+    i2cip_errorlevel_t set(const String& value, const i2cip_lcd_args_t& args) override;
 };
 
 #endif

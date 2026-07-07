@@ -8,8 +8,8 @@ using namespace I2CIP;
 
 I2CIP_DEVICE_INIT_STATIC_ID(MCP23008);
 // By default, ALL input, no/low output
-I2CIP_INPUT_INIT_RESET(MCP23008, i2cip_mcp23008_t, 0x0000, i2cip_mcp23008_bitmask_t, 0xFFFF);
-I2CIP_OUTPUT_INIT_FAILSAFE(MCP23008, i2cip_mcp23008_t, 0x0000, i2cip_mcp23008_bitmask_t, 0x0000);
+I2CIP_INPUT_INIT_RESET(MCP23008, i2cip_mcp23008_t, 0x00, i2cip_mcp23008_bitmask_t, 0xFF);
+I2CIP_OUTPUT_INIT_FAILSAFE(MCP23008, i2cip_mcp23008_t, 0x00, i2cip_mcp23008_bitmask_t, 0x00);
 
 void MCP23008::parseJSONArgs(I2CIP::i2cip_args_io_t& argsDest, JsonVariant argsA, JsonVariant argsS, JsonVariant argsB) {
   if(argsA.is<int>()) {
@@ -257,6 +257,45 @@ i2cip_errorlevel_t MCP23008::set(const i2cip_mcp23008_t& value, const i2cip_mcp2
   errlev = writeRegister(reg, (uint8_t)(send & 0xFF), false);
   I2CIP_ERR_BREAK(errlev);
   // errlev = writeRegister((uint8_t)(reg + I2CIP_MCP23017_BANKJUMP), (uint8_t)((send >> 8) & 0xFF), false);
+
+  return errlev;
+}
+
+I2CIP_OUTPUT_INIT_FAILSAFE(LCD, String, "FAIL", i2cip_lcd_args_t, LCD_ARGS_NONE); // Default to just updating RGB
+
+LCD::LCD(MCP23008* mcp) : mcp(mcp), OutputInterface<String, i2cip_lcd_args_t>(nullptr) { } // TODO: Should this not be nullptr? Should it be mcp?
+
+LCD::~LCD() { }
+
+size_t LCD::write(uint8_t c) {
+  return this->send(c, true) == I2CIP_ERR_NONE ? 1 : 0; // Return number of bytes written
+}
+
+i2cip_errorlevel_t LCD::set(const String& value, const i2cip_lcd_args_t& args) {
+  if(this->mcp == nullptr) {
+    return I2CIP_ERR_SOFT;
+  }
+
+  // COMMAND Function set: 2-line, 5x8 dots (default), 4-bit mode (default)
+  i2cip_errorlevel_t errlev = this->send(I2CIP_LCD_FUNCTIONSET | I2CIP_LCD_2LINE, false);
+  I2CIP_ERR_BREAK(errlev);
+
+  // COMMAND Display control: display on, cursor off (default), blink off (default)
+  errlev = this->send(I2CIP_LCD_DISPLAYCONTROL | I2CIP_LCD_DISPLAYON, false);
+  I2CIP_ERR_BREAK(errlev);
+
+  // COMMAND Entry mode: increment cursor (default), no display shift (default)
+  errlev = this->send(I2CIP_LCD_ENTRYMODESET | I2CIP_LCD_ENTRYLEFT, false);
+  I2CIP_ERR_BREAK(errlev);
+
+  // Backlight
+  errlev = this->mcp->set((i2cip_mcp23008_t)(1 << I2CIP_LCD_MCP23008_BACKLIGHT), (i2cip_mcp23008_bitmask_t)(1 << I2CIP_LCD_MCP23008_BACKLIGHT));
+  I2CIP_ERR_BREAK(errlev);
+
+  for(uint8_t i = 0; i < value.length(); i++) {
+    errlev = this->send(value.c_str()[i], true);
+    I2CIP_ERR_BREAK(errlev);
+  }
 
   return errlev;
 }
