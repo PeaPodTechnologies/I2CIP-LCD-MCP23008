@@ -312,7 +312,7 @@ i2cip_errorlevel_t LCD::set(const String& value, const i2cip_lcd_args_t& args) {
   )); // Set RS bit; set E bit low
   I2CIP_ERR_BREAK(errlev);
 
-  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set 4-bit mode
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(I2CIP_LCD_DATAMASK)); // Set 4-bit mode
   I2CIP_ERR_BREAK(errlev);
 
   errlev = pulseEnable();
@@ -321,14 +321,14 @@ i2cip_errorlevel_t LCD::set(const String& value, const i2cip_lcd_args_t& args) {
   delayMicroseconds(4500);
 
   // second try
-  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set 4-bit mode
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(I2CIP_LCD_DATAMASK)); // Set 4-bit mode
   I2CIP_ERR_BREAK(errlev);
 
   errlev = pulseEnable();
   I2CIP_ERR_BREAK(errlev);
   delayMicroseconds(4500); // wait min 4.1ms
 
-  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000));
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x03 << 3), (i2cip_mcp23008_bitmask_t)(I2CIP_LCD_DATAMASK));
   I2CIP_ERR_BREAK(errlev);
 
   errlev = pulseEnable();
@@ -336,7 +336,7 @@ i2cip_errorlevel_t LCD::set(const String& value, const i2cip_lcd_args_t& args) {
   delayMicroseconds(150);
 
   // set to 8-bit interface
-  errlev = this->mcp->set((i2cip_mcp23008_t)(0x02 << 3), (i2cip_mcp23008_bitmask_t)(0b01111000));
+  errlev = this->mcp->set((i2cip_mcp23008_t)(0x02 << 3), (i2cip_mcp23008_bitmask_t)(I2CIP_LCD_DATAMASK));
   I2CIP_ERR_BREAK(errlev);
 
   errlev = pulseEnable();

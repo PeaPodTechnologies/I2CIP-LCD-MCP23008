@@ -93,6 +93,9 @@ class MCP23008 : public Device, public IOInterface<i2cip_mcp23008_t, i2cip_mcp23
 #define I2CIP_LCD_MCP23008_RS 0x1
 #define I2CIP_LCD_MCP23008_E 0x2
 
+// Mask
+#define I2CIP_LCD_DATAMASK 0b01111000
+
 // Commands
 #define I2CIP_LCD_CLEARDISPLAY 0x01 // Clear display, set cursor position to zero
 #define I2CIP_LCD_RETURNHOME 0x02   // Set cursor position to zero
@@ -174,7 +177,7 @@ class LCD : public OutputInterface<String, i2cip_lcd_args_t>, private Print {
       
       // Send high nibble
 
-      errlev = this->mcp->set((i2cip_mcp23008_t)(((value >> 4) & 0x0F) << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set high nibble
+      errlev = this->mcp->set((i2cip_mcp23008_t)(((value >> 4) & 0x0F) << 3), (i2cip_mcp23008_bitmask_t)(I2CIP_LCD_DATAMASK)); // Set high nibble
       I2CIP_ERR_BREAK(errlev);
 
       errlev = pulseEnable();
@@ -182,7 +185,7 @@ class LCD : public OutputInterface<String, i2cip_lcd_args_t>, private Print {
 
       // Send low nibble
 
-      errlev = this->mcp->set((i2cip_mcp23008_t)((value & 0x0F) << 3), (i2cip_mcp23008_bitmask_t)(0b01111000)); // Set low nibble
+      errlev = this->mcp->set((i2cip_mcp23008_t)((value & 0x0F) << 3), (i2cip_mcp23008_bitmask_t)(I2CIP_LCD_DATAMASK)); // Set low nibble
       I2CIP_ERR_BREAK(errlev);
 
       return pulseEnable();
