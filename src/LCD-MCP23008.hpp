@@ -201,7 +201,7 @@ class LCD : public OutputInterface<String, i2cip_lcd_args_t>, private Print {
 
     size_t write(uint8_t c) override;
 
-    i2cip_errorlevel_t set(const String& value, const i2cip_lcd_args_t& args) override;
+    i2cip_errorlevel_t set(const String& value, const i2cip_lcd_args_t& args = LCD_ARGS_NONE) override;
 };
 
 #endif
